@@ -1,0 +1,4 @@
+<!-- launch image screen stuff -->
+<launch>
+  <node name="image_screen" pkg="projector" type="image_screen" respawn="true" output="screen" />
+</launch>

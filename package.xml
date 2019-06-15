@@ -12,7 +12,7 @@
   <buildtool_depend>catkin</buildtool_depend>
   <depend>std_msgs</depend>
   <depend>cv_bridge</depend>
-  <depend>eigen_conversions</depend>
+<!--  <depend>eigen_conversions</depend>-->
   <depend>image_transport</depend>
   <depend>pcl_ros</depend>
   <depend>roscpp</depend>

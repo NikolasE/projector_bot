@@ -7,7 +7,7 @@ add_compile_options(-std=c++11)
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
-  eigen_conversions
+  # eigen_conversions
   image_transport
         laser_geometry
   pcl_ros

@@ -2,8 +2,9 @@
 <launch>
 
   <!-- static tfs -->
-  <node pkg="tf" type="static_transform_publisher" name="map_nav_broadcaster" args="0 0 0 0 0 0 base_footprint laser 100"/>
-  <node pkg="tf" type="static_transform_publisher" name="las_broadcaster" args="0 0 0 0 0 0 laser laser_mount_link 100"/>
+  <node pkg="tf2_ros" type="static_transform_publisher" name="tf_base_laser" args="0 0 0  0 0 0  base_footprint laser"/>
+  <node pkg="tf2_ros" type="static_transform_publisher" name="tf_laser_lasermount" args="0 0 0  0 0 0  laser laser_mount_link"/>
+  <node pkg="tf2_ros" type="static_transform_publisher" name="tf_laser_cam" args="0 0 0  0 0 0  laser camera" />
 
   <!-- laser -->
   <include file="$(find sick_tim)/launch/sick_tim571_2050101.launch" />

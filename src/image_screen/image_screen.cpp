@@ -11,6 +11,10 @@
 
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
+#include <nav_msgs/Path.h>
+#include <geometry_msgs/PoseStamped.h>
+//#include <occgrid_planner/Trajectory.h>
+
 using std::vector;
 using cv::Point2f;
 
@@ -170,6 +174,18 @@ void ImageScreen::reconnect()
 }
 
 
+void ImageScreen::path_cb(const nav_msgs::Path& path)
+{
+  for (size_t i=0; i<path->poses.size(); i++)
+  {
+    point_cb_(&path->poses[i]);  
+  } 
+}
+
+void ImageScreen::getPath()
+{
+  path_sub_ = nh_private_.subscribe<nav_msgs::Path>("/move_base/TrajectoryPlannerROS/local_plan",1,&ImageSreen::path_cb,this);
+}
 
 void ImageScreen::read_corners_() {
     {

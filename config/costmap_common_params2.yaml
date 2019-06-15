@@ -21,9 +21,11 @@ map_topic: /map
 observation_sources: laser_scan_sensor #point_cloud_sensor
 global_frame: map
 subscribe_to_updates: true
-always_send_full_costmap: true
+# always_send_full_costmap: true
 # marking - add obstacle information to cost map
 # clearing - clear obstacle information to cost map
 laser_scan_sensor: {sensor_frame: laser, data_type: LaserScan, topic: /scan, marking: true, clearing: true}
 robot_base_frame: base_footprint
 #point_cloud_sensor: {sensor_frame: frame_name, data_type: PointCloud, topic: topic_name, marking: true, clearing: true}
+
+transform_tolerance: 0.5

@@ -3,11 +3,12 @@
 #include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/highgui/highgui.hpp>
+#include <mutex>
+
 #include <std_msgs/Bool.h>
 #include <std_msgs/Empty.h>
-#include <mutex>
 #include <geometry_msgs/Point.h>
-
+#include <nav_msgs/Path.h>
 #include <sensor_msgs/LaserScan.h>
 #include <laser_geometry/laser_geometry.h>
 #include <tf2_ros/transform_listener.h>
@@ -33,14 +34,12 @@ public:
   void read_corners_();
   std::string corner_file_path_;
 
-    laser_geometry::LaserProjection projector_;
+  laser_geometry::LaserProjection projector_;
 
+  std::vector<cv::Point2f> metric_corners_;
 
-    std::vector<cv::Point2f> metric_corners_;
-
-
-    tf2_ros::Buffer tfBuffer;
-    tf2_ros::TransformListener tfListener;
+  tf2_ros::Buffer tfBuffer;
+  tf2_ros::TransformListener tfListener;
 
   cv::Mat metric2Pixels;
 
@@ -51,6 +50,10 @@ public:
 
   void point_cb_(const geometry_msgs::PointStampedConstPtr& pt);
   ros::Subscriber sub_pt;
+
+  ros::Subscriber path_sub_;
+  void path_cb(const nav_msgs::Path& path);
+  void getPath();
 
 // private:
   ros::NodeHandle nh_private_;

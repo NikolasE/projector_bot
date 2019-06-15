@@ -8,6 +8,7 @@
 #include <iostream>
 #include <fstream>
 
+#include <ros/package.h>
 
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
@@ -23,7 +24,7 @@ nh_private_("~"),
 display_name_("projection_window"),
 debug_(false),
 window_is_open_(false),
-corner_file_path_("/tmp/tetris_corners.txt"),
+corner_file_path_(ros::package::getPath("roslib") + "/tmp/tetris_corners.txt"),
 tfListener(tfBuffer)
 {
   nh_private_.param<int>("/projector_width", img_size_.width, 1920);
@@ -176,15 +177,15 @@ void ImageScreen::reconnect()
 
 void ImageScreen::path_cb(const nav_msgs::Path& path)
 {
-  for (size_t i=0; i<path->poses.size(); i++)
+  for (size_t i=0; i<path.poses.size(); i++)
   {
-    point_cb_(&path->poses[i]);  
+    point_cb_(path.poses[i]);  
   } 
 }
 
 void ImageScreen::getPath()
 {
-  path_sub_ = nh_private_.subscribe<nav_msgs::Path>("/move_base/TrajectoryPlannerROS/local_plan",1,&ImageSreen::path_cb,this);
+  path_sub_ = nh_private_.subscribe<nav_msgs::Path>("/move_base/TrajectoryPlannerROS/local_plan",1,&ImageScreen::path_cb,this);
 }
 
 void ImageScreen::read_corners_() {

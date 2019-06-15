@@ -1,0 +1,29 @@
+obstacle_range: 6.0 # 2.5
+raytrace_range: 7.0 # 3.0
+#footprint: [[x0, y0], [x1, y1], ... [xn, yn]]
+
+#rectangle frontfacing
+#initial version
+#footprint: [[0.33, -0.225], [0.33, 0.70], [-0.33, 0.70], [-0.33, -0.225]]
+#corrected version, x axis is y and y is x
+footprint: [[ -0.225,0.33], [ 0.70,0.33], [ 0.70,-0.33], [ -0.225,-0.33]]
+
+#rectangle Back facing
+#footprint: [[0.33, 0.225], [0.33, -0.70], [-0.33, -0.70], [-0.33, 0.225]]
+
+
+# for circular
+#robot_radius: 0.55 # distance a circular robot should be clear of the obstacle
+#robot_radius: ir_of_robot
+
+inflation_radius: 0.3 #3.0
+map_topic: /map
+observation_sources: laser_scan_sensor #point_cloud_sensor
+global_frame: map
+subscribe_to_updates: true
+always_send_full_costmap: true
+# marking - add obstacle information to cost map
+# clearing - clear obstacle information to cost map
+laser_scan_sensor: {sensor_frame: laser, data_type: LaserScan, topic: /scan, marking: true, clearing: true}
+robot_base_frame: base_footprint
+#point_cloud_sensor: {sensor_frame: frame_name, data_type: PointCloud, topic: topic_name, marking: true, clearing: true}

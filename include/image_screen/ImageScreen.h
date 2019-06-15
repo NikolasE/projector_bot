@@ -48,6 +48,12 @@ public:
 
 //  cv::Mat warpMatrix;
 
+    cv::Point2f last_head_px;
+    ros::Time last_head_stamp;
+
+   
+
+
   ros::Subscriber sub_laser_, sub_path, sub_heads;
 
   void path_cb(const nav_msgs::PathConstPtr& path);

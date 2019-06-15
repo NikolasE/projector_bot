@@ -56,7 +56,7 @@ void ImageScreen::head_cb(const geometry_msgs::PointStampedConstPtr &pt) {
 
     try {
         tfBuffer.transform(*pt, p2, new_frame);
-        ROS_INFO("In laser Frame: %f %f", p2.point.x, p2.point.y);
+//        ROS_INFO("In laser Frame: %f %f", p2.point.x, p2.point.y);
     }
     catch (tf2::TransformException &ex)
     {
@@ -66,17 +66,20 @@ void ImageScreen::head_cb(const geometry_msgs::PointStampedConstPtr &pt) {
 
     vector<Point2f> dstPoints, srcPoints;
 
-    srcPoints.push_back(cv::Point2f(p2.point.x, p2.point.y));
+    srcPoints.push_back(cv::Point2f(p2.point.z, -p2.point.x));
     cv::perspectiveTransform(srcPoints, dstPoints, metric2Pixels);
 
     cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
     img.setTo(cv::Scalar(0, 0, 255));
 
-    const auto& q = dstPoints[0];
-    cv::circle(img, q, 20, cv::Scalar(0, 0, 255), -1);
+    last_head_px = dstPoints[0];
+    last_head_stamp = ros::Time::now();
 
-    cv::imshow(display_name_, img);
-    cv::waitKey(1);
+//    const auto& q = dstPoints[0];
+//    cv::circle(img, q, 20, cv::Scalar(0, 0, 255), -1);
+//
+//    cv::imshow(display_name_, img);
+//    cv::waitKey(1);
 }
 
 
@@ -144,7 +147,7 @@ void ImageScreen::point_cb_(const geometry_msgs::PointStampedConstPtr &pt_s) {
 
     try {
         tfBuffer.transform(*pt_s, p2, new_frame);
-        ROS_INFO("In laser Frame: %f %f", p2.point.x, p2.point.y);
+//        ROS_INFO("In laser Frame: %f %f", p2.point.x, p2.point.y);
     }
     catch (tf2::TransformException &ex)
         {
@@ -204,6 +207,7 @@ void ImageScreen::reconnect()
   sub_path = nh_private_.subscribe("/move_base/TrajectoryPlannerROS/global_plan",1, &ImageScreen::path_cb,this);
 
   img_sub_ = nh_private_.subscribe("/usb_cam/image_raw", 1, &ImageScreen::img_cb_, this);
+  sub_heads = nh_private_.subscribe("/heads", 1, &ImageScreen::head_cb, this);
 
   toggle_sub_ = nh_private_.subscribe("activate", 1, &ImageScreen::toggle_cb_, this);
   toggle_sub_ = nh_private_.subscribe("black", 1, &ImageScreen::black_cb_, this);
@@ -224,7 +228,7 @@ void ImageScreen::path_cb(const nav_msgs::PathConstPtr& path)
         p2.header.frame_id = new_frame;
         try {
             tfBuffer.transform(cp, p2, new_frame);
-            ROS_INFO("In laser Frame: %f %f", p2.pose.position.x, p2.pose.position.y);
+//            ROS_INFO("In laser Frame: %f %f", p2.pose.position.x, p2.pose.position.y);
         }
         catch (tf2::TransformException &ex)
         {
@@ -233,7 +237,7 @@ void ImageScreen::path_cb(const nav_msgs::PathConstPtr& path)
         }
 
         srcPoints.push_back(Point2f(p2.pose.position.x, p2.pose.position.y));
-        ROS_INFO("In laser frame: %f %f", p2.pose.position.x, p2.pose.position.y);
+        // ROS_INFO("In laser frame: %f %f", p2.pose.position.x, p2.pose.position.y);
     }
 
     cv::perspectiveTransform(srcPoints, dstPoints, metric2Pixels);
@@ -242,12 +246,30 @@ void ImageScreen::path_cb(const nav_msgs::PathConstPtr& path)
     img.setTo(cv::Scalar(255, 255, 255));
 
 
-    for (const auto& d: dstPoints)
+    for (size_t i=0; i<dstPoints.size()-1; i+= 1)
     {
-        ROS_INFO("Transformed to %f %f", d.x, d.y);
-        cv::circle(img, cv::Point(d.x, d.y), 20, cv::Scalar(0, 255, 0), -1);
+        const auto& a = dstPoints[i];
+        const auto& b = dstPoints[i+1];
 
+        cv::line(img, cv::Point(a.x, a.y), cv::Point(b.x, b.y), cv::Scalar(0, 255, 0), 20);
     }
+
+    float dt = (ros::Time::now() - last_head_stamp).toSec();
+    ROS_INFO("Time since last head pose: %.1f sec", dt);
+
+    if (dt < 3)
+    {
+        ROS_INFO("DRAWING HEAD POSITION");
+        cv::circle(img, last_head_px, 20, cv::Scalar(0, 255, 0), -1);
+    }
+
+
+
+//    for (const auto& d: dstPoints)
+//    {
+        // ROS_INFO("Transformed to %f %f", d.x, d.y);
+//        cv::circle(img, cv::Point(d.x, d.y), 20, cv::Scalar(0, 255, 0), -1);
+//    }
 
     show_image(img);
 
@@ -338,9 +360,6 @@ void ImageScreen::corner_trigger()
   }
 
   show_image(img);
-
-//  cv::imshow(display_name_, img);
-//  cv::waitKey(1);
 }
 
 

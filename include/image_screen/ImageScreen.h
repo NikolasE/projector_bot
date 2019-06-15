@@ -12,7 +12,7 @@
 #include <sensor_msgs/LaserScan.h>
 #include <laser_geometry/laser_geometry.h>
 #include <tf2_ros/transform_listener.h>
-
+#include <nav_msgs/Path.h>
 
 class ImageScreen
 {
@@ -36,16 +36,22 @@ public:
 
   laser_geometry::LaserProjection projector_;
 
-  std::vector<cv::Point2f> metric_corners_;
+    std::string new_frame;
+    std::vector<cv::Point2f> metric_corners_;
 
-  tf2_ros::Buffer tfBuffer;
-  tf2_ros::TransformListener tfListener;
+
+    tf2_ros::Buffer tfBuffer;
+    tf2_ros::TransformListener tfListener;
+
 
   cv::Mat metric2Pixels;
 
 //  cv::Mat warpMatrix;
 
-  ros::Subscriber sub_laser_;
+  ros::Subscriber sub_laser_, sub_path;
+
+  void path_cb(const nav_msgs::PathConstPtr& path);
+
   void laser_cb(const sensor_msgs::LaserScanConstPtr& msg);
 
   void point_cb_(const geometry_msgs::PointStampedConstPtr& pt);

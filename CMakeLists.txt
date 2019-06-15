@@ -7,18 +7,16 @@ add_compile_options(-std=c++11)
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
-  # eigen_conversions
   image_transport
-        laser_geometry
-  pcl_ros
+  laser_geometry
   roscpp
   tf2_ros
-        tf2
+  tf2
 )
 
 find_package(OpenCV REQUIRED core imgproc highgui)
 
-# catkin_python_setup()
+
 catkin_package()
 
 ## Specify additional locations of header files
@@ -43,11 +41,3 @@ install(TARGETS
   image_screen
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
-
-#install(PROGRAMS
-#  src/projector/nodes/game.py
-#  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-#)
-
-
-

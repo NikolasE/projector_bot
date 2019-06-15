@@ -24,8 +24,9 @@ nh_private_("~"),
 display_name_("projection_window"),
 debug_(false),
 window_is_open_(false),
-corner_file_path_(ros::package::getPath("roslib") + "/tmp/tetris_corners.txt"),
-tfListener(tfBuffer)
+corner_file_path_("/tmp/tetris_corners.txt"),
+tfListener(tfBuffer),
+new_frame("laser")
 {
   nh_private_.param<int>("/projector_width", img_size_.width, 1920);
   nh_private_.param<int>("/projector_height", img_size_.height, 1080);
@@ -104,7 +105,7 @@ void ImageScreen::point_cb_(const geometry_msgs::PointStampedConstPtr &pt_s) {
 
     geometry_msgs::PointStamped p2;
 
-    std::string new_frame = "laser";
+
 
     ROS_INFO("Transforming from %s to %s", pt_s->header.frame_id.c_str(), new_frame.c_str());
 
@@ -168,6 +169,8 @@ void ImageScreen::reconnect()
   sub_pt = nh_private_.subscribe("/pt", 1, &ImageScreen::point_cb_, this);
   sub_laser_ = nh_private_.subscribe("/scan", 1, &ImageScreen::laser_cb, this);
 
+  sub_path = nh_private_.subscribe("/move_base/TrajectoryPlannerROS/global_plan",1, &ImageScreen::path_cb,this);
+
   img_sub_ = nh_private_.subscribe("/usb_cam/image_raw", 1, &ImageScreen::img_cb_, this);
 
   toggle_sub_ = nh_private_.subscribe("activate", 1, &ImageScreen::toggle_cb_, this);
@@ -175,18 +178,49 @@ void ImageScreen::reconnect()
 }
 
 
-void ImageScreen::path_cb(const nav_msgs::Path& path)
+void ImageScreen::path_cb(const nav_msgs::PathConstPtr& path)
 {
-  for (size_t i=0; i<path.poses.size(); i++)
-  {
-    point_cb_(path.poses[i]);  
-  } 
+    ROS_INFO("GOT PATH WITH %zu points", path->poses.size());
+
+    vector<Point2f> srcPoints, dstPoints;
+    for (auto& pt: path->poses)
+    {
+        geometry_msgs::PoseStamped cp = pt;
+        cp.header.stamp = ros::Time::now()-ros::Duration(0.2);
+
+        geometry_msgs::PoseStamped p2;
+        p2.header.frame_id = new_frame;
+        try {
+            tfBuffer.transform(cp, p2, new_frame);
+            ROS_INFO("In laser Frame: %f %f", p2.pose.position.x, p2.pose.position.y);
+        }
+        catch (tf2::TransformException &ex)
+        {
+            ROS_WARN("Failure %s\n", ex.what()); //Print exception which was caught
+            return;
+        }
+
+        srcPoints.push_back(Point2f(p2.pose.position.x, p2.pose.position.y));
+        ROS_INFO("In laser frame: %f %f", p2.pose.position.x, p2.pose.position.y);
+    }
+
+    cv::perspectiveTransform(srcPoints, dstPoints, metric2Pixels);
+
+    cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
+    img.setTo(cv::Scalar(255, 255, 255));
+
+
+    for (const auto& d: dstPoints)
+    {
+        ROS_INFO("Transformed to %f %f", d.x, d.y);
+        cv::circle(img, cv::Point(d.x, d.y), 20, cv::Scalar(0, 255, 0), -1);
+
+    }
+
+    show_image(img);
+
 }
 
-void ImageScreen::getPath()
-{
-  path_sub_ = nh_private_.subscribe<nav_msgs::Path>("/move_base/TrajectoryPlannerROS/local_plan",1,&ImageScreen::path_cb,this);
-}
 
 void ImageScreen::read_corners_() {
     {

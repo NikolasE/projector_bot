@@ -45,14 +45,21 @@ public:
 
 
   cv::Mat metric2Pixels;
+  nav_msgs::Path current_path;
 
 //  cv::Mat warpMatrix;
 
     cv::Point2f last_head_px;
     ros::Time last_head_stamp;
 
-   
+    sensor_msgs::PointCloud last_laser;
 
+    void drawPath(cv::Mat& img);
+
+    void drawLaser(cv::Mat& img);
+
+    ros::Timer timer;
+    void timer_callback(const ros::TimerEvent&);
 
   ros::Subscriber sub_laser_, sub_path, sub_heads;
 

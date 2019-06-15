@@ -48,6 +48,35 @@ new_frame("laser")
   cv::waitKey(1);
 }
 
+void ImageScreen::timer_callback(const ros::TimerEvent&)
+{
+
+    ROS_INFO("TIMER CALLBACK");
+
+    cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
+    img.setTo(cv::Scalar(0, 0, 0));
+
+    // Laser:
+    drawLaser(img);
+    drawPath(img);
+
+    // HEAD
+    float dt = (ros::Time::now() - last_head_stamp).toSec();
+    ROS_INFO("Time since last head pose: %.1f sec", dt);
+
+    if (dt < 3)
+    {
+        ROS_INFO("DRAWING HEAD POSITION");
+        cv::circle(img, last_head_px, 200, cv::Scalar(125, 255, 0), 20);
+    }
+
+
+    show_image(img);
+
+}
+
+
+// high update rate!
 void ImageScreen::head_cb(const geometry_msgs::PointStampedConstPtr &pt) {
     ROS_INFO("GOT A HEAD POSITION");
 
@@ -69,8 +98,8 @@ void ImageScreen::head_cb(const geometry_msgs::PointStampedConstPtr &pt) {
     srcPoints.push_back(cv::Point2f(p2.point.z, -p2.point.x));
     cv::perspectiveTransform(srcPoints, dstPoints, metric2Pixels);
 
-    cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
-    img.setTo(cv::Scalar(0, 0, 255));
+//    cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
+//    img.setTo(cv::Scalar(0, 0, 255));
 
     last_head_px = dstPoints[0];
     last_head_stamp = ros::Time::now();
@@ -83,35 +112,30 @@ void ImageScreen::head_cb(const geometry_msgs::PointStampedConstPtr &pt) {
 }
 
 
-
-void ImageScreen::laser_cb(const sensor_msgs::LaserScanConstPtr &msg)
+void ImageScreen::drawLaser(cv::Mat& img)
 {
-    return;
 
-    if (metric_corners_.size() != 4)
+    if (last_laser.points.empty())
     {
-        ROS_WARN("Metric corners: %zu", metric_corners_.size());
+        ROS_WARN("DID NOT GET Lasers yet!");
         return;
     }
 
-    sensor_msgs::PointCloud cloud;
-    projector_.projectLaser(*msg, cloud);
-
+    ROS_INFO("Laser points: %zu", last_laser.points.size());
 
     vector<Point2f> srcPoints;
 
-    for (size_t i=0; i<cloud.points.size(); i+= 10)
+    for (size_t i=0; i<last_laser.points.size(); i+= 1)
     {
-        const auto& p = cloud.points[i];
+        const auto& p = last_laser.points[i];
         srcPoints.push_back(Point2f(p.x, p.y));
     }
 
     vector<Point2f> dstPoints;
     cv::perspectiveTransform(srcPoints, dstPoints, metric2Pixels);
 
-    cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
-    img.setTo(cv::Scalar(255,0,0));
 
+     int good = 0;
     for (const auto& px: dstPoints)
     {
         const cv::Point q(px.x, px.y);
@@ -119,12 +143,56 @@ void ImageScreen::laser_cb(const sensor_msgs::LaserScanConstPtr &msg)
             continue;
         }
 
-        cv::circle(img, q, 20, cv::Scalar(0, 0, 255), -1);
-
+        good += 1;
+        cv::circle(img, q, 20, cv::Scalar(255, 0, 255), -1);
     }
 
-    cv::imshow(display_name_, img);
-    cv::waitKey(1);
+    ROS_INFO("visible laser points: %i", good);
+
+}
+
+
+void ImageScreen::laser_cb(const sensor_msgs::LaserScanConstPtr &msg)
+{
+
+//    if (metric_corners_.size() != 4)
+//    {
+//        ROS_WARN("Metric corners: %zu", metric_corners_.size());
+//        return;
+//    }
+
+    sensor_msgs::PointCloud cloud;
+    projector_.projectLaser(*msg, cloud);
+
+    last_laser = cloud;
+
+//    vector<Point2f> srcPoints;
+//
+//    for (size_t i=0; i<cloud.points.size(); i+= 10)
+//    {
+//        const auto& p = cloud.points[i];
+//        srcPoints.push_back(Point2f(p.x, p.y));
+//    }
+//
+//    vector<Point2f> dstPoints;
+//    cv::perspectiveTransform(srcPoints, dstPoints, metric2Pixels);
+//
+//    cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
+//    img.setTo(cv::Scalar(255,0,0));
+//
+//    for (const auto& px: dstPoints)
+//    {
+//        const cv::Point q(px.x, px.y);
+//        if (q.x < 0 || q.y < 0 || q.x >= img_size_.width || q.y >=img_size_.height) {
+//            continue;
+//        }
+//
+//        cv::circle(img, q, 20, cv::Scalar(0, 0, 255), -1);
+//
+//    }
+//
+//    cv::imshow(display_name_, img);
+//    cv::waitKey(1);
 }
 
 
@@ -137,7 +205,7 @@ void ImageScreen::point_cb_(const geometry_msgs::PointStampedConstPtr &pt_s) {
     }
 
     cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
-    img.setTo(cv::Scalar(255,0,0));
+    img.setTo(cv::Scalar(0,0,0));
 
     geometry_msgs::PointStamped p2;
 
@@ -157,29 +225,6 @@ void ImageScreen::point_cb_(const geometry_msgs::PointStampedConstPtr &pt_s) {
 
     geometry_msgs::Point pt = p2.point;
 
-//    {
-//        vector<cv::Point2f> pts;
-//
-//        float l = 0.5;
-//
-//        pts.push_back(Point2f(pt.x, pt.y));
-//        pts.push_back(Point2f(pt.x+l, pt.y));
-//        pts.push_back(Point2f(pt.x+l, pt.y+l));
-//        pts.push_back(Point2f(pt.x, pt.y+l));
-//
-//        vector<Point2f> dstPoints;
-//        cv::perspectiveTransform(pts, dstPoints, metric2Pixels);
-//
-//        for (int i=0; i<4; ++i)
-//        {
-//            const auto& p1 = dstPoints[i];
-//            const auto& p2 = dstPoints[(i+1)%4];
-//
-//            cv::line(img, cv::Point(p1.x, p1.y), cv::Point(p2.x, p2.y), cv::Scalar(255, 255, 0), 30);
-//        }
-//
-//    }
-
     vector<Point2f> dstPoints, srcPoints;
     srcPoints.push_back(Point2f(pt.x, pt.y));
     cv::perspectiveTransform(srcPoints, dstPoints, metric2Pixels);
@@ -196,7 +241,6 @@ void ImageScreen::point_cb_(const geometry_msgs::PointStampedConstPtr &pt_s) {
 
 void ImageScreen::reconnect()
 {
-
     read_corners_();
 
   last_image_callback_ = ros::Time::now();
@@ -211,15 +255,27 @@ void ImageScreen::reconnect()
 
   toggle_sub_ = nh_private_.subscribe("activate", 1, &ImageScreen::toggle_cb_, this);
   toggle_sub_ = nh_private_.subscribe("black", 1, &ImageScreen::black_cb_, this);
+
+  timer =  nh_private_.createTimer(ros::Duration(0.05), &ImageScreen::timer_callback, this);
 }
 
 
-void ImageScreen::path_cb(const nav_msgs::PathConstPtr& path)
-{
+void ImageScreen::path_cb(const nav_msgs::PathConstPtr& path) {
     ROS_INFO("GOT PATH WITH %zu points", path->poses.size());
+    current_path = *path;
+}
+
+void ImageScreen::drawPath(cv::Mat& img)
+{
+
+    if (current_path.poses.empty())
+    {
+        ROS_WARN("DID NOT GET PATH YET");
+        return;
+    }
 
     vector<Point2f> srcPoints, dstPoints;
-    for (auto& pt: path->poses)
+    for (auto& pt: current_path.poses)
     {
         geometry_msgs::PoseStamped cp = pt;
         cp.header.stamp = ros::Time::now()-ros::Duration(0.2);
@@ -242,8 +298,8 @@ void ImageScreen::path_cb(const nav_msgs::PathConstPtr& path)
 
     cv::perspectiveTransform(srcPoints, dstPoints, metric2Pixels);
 
-    cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
-    img.setTo(cv::Scalar(255, 255, 255));
+//    cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
+//    img.setTo(cv::Scalar(255, 255, 255));
 
 
     for (size_t i=0; i<dstPoints.size()-1; i+= 1)
@@ -254,16 +310,6 @@ void ImageScreen::path_cb(const nav_msgs::PathConstPtr& path)
         cv::line(img, cv::Point(a.x, a.y), cv::Point(b.x, b.y), cv::Scalar(0, 255, 0), 20);
     }
 
-    float dt = (ros::Time::now() - last_head_stamp).toSec();
-    ROS_INFO("Time since last head pose: %.1f sec", dt);
-
-    if (dt < 3)
-    {
-        ROS_INFO("DRAWING HEAD POSITION");
-        cv::circle(img, last_head_px, 20, cv::Scalar(0, 255, 0), -1);
-    }
-
-
 
 //    for (const auto& d: dstPoints)
 //    {
@@ -271,8 +317,7 @@ void ImageScreen::path_cb(const nav_msgs::PathConstPtr& path)
 //        cv::circle(img, cv::Point(d.x, d.y), 20, cv::Scalar(0, 255, 0), -1);
 //    }
 
-    show_image(img);
-
+//    show_image(img);
 }
 
 

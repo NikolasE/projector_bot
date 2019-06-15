@@ -23,12 +23,10 @@
     <rosparam file="$(find projector_bot)/config/global_costmap_params2.yaml" command="load" />
     <rosparam file="$(find projector_bot)/config/base_local_planner_params.yaml" command="load" />
     
-    <remap from="cmd_vel" to="cmd_vel"/>
-    <remap from="odom" to="odom"/>
-    <remap from="scan" to="/scan"/>
     <param name="move_base/DWAPlannerROS/yaw_goal_tolerance" value="1.0"/>
     <param name="move_base/DWAPlannerROS/xy_goal_tolerance" value="1.0"/>
-    <param name="controller_frequency" value="4.0" />
+    <param name="controller_frequency" value="5.0"/>
+    <param name="planner_frequency" value="5.0"/>
   </node>
 
   <!-- hector mapping -->

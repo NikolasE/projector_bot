@@ -48,6 +48,39 @@ new_frame("laser")
   cv::waitKey(1);
 }
 
+void ImageScreen::head_cb(const geometry_msgs::PointStampedConstPtr &pt) {
+    ROS_INFO("GOT A HEAD POSITION");
+
+    geometry_msgs::PointStamped p2;
+    p2.header.frame_id = new_frame;
+
+    try {
+        tfBuffer.transform(*pt, p2, new_frame);
+        ROS_INFO("In laser Frame: %f %f", p2.point.x, p2.point.y);
+    }
+    catch (tf2::TransformException &ex)
+    {
+        ROS_WARN("Failure %s\n", ex.what()); //Print exception which was caught
+        return;
+    }
+
+    vector<Point2f> dstPoints, srcPoints;
+
+    srcPoints.push_back(cv::Point2f(p2.point.x, p2.point.y));
+    cv::perspectiveTransform(srcPoints, dstPoints, metric2Pixels);
+
+    cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
+    img.setTo(cv::Scalar(0, 0, 255));
+
+    const auto& q = dstPoints[0];
+    cv::circle(img, q, 20, cv::Scalar(0, 0, 255), -1);
+
+    cv::imshow(display_name_, img);
+    cv::waitKey(1);
+}
+
+
+
 void ImageScreen::laser_cb(const sensor_msgs::LaserScanConstPtr &msg)
 {
     return;
@@ -143,7 +176,6 @@ void ImageScreen::point_cb_(const geometry_msgs::PointStampedConstPtr &pt_s) {
 //        }
 //
 //    }
-
 
     vector<Point2f> dstPoints, srcPoints;
     srcPoints.push_back(Point2f(pt.x, pt.y));

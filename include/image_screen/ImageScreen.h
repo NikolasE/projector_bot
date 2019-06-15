@@ -48,9 +48,10 @@ public:
 
 //  cv::Mat warpMatrix;
 
-  ros::Subscriber sub_laser_, sub_path;
+  ros::Subscriber sub_laser_, sub_path, sub_heads;
 
   void path_cb(const nav_msgs::PathConstPtr& path);
+  void head_cb(const geometry_msgs::PointStampedConstPtr& pt);
 
   void laser_cb(const sensor_msgs::LaserScanConstPtr& msg);
 

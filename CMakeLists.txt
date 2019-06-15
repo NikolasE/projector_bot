@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   roscpp
   tf2_ros
+        tf2
 )
 
 find_package(OpenCV REQUIRED core imgproc highgui)

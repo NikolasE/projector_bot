@@ -9,7 +9,7 @@
 #include <fstream>
 
 
-
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 using std::vector;
 using cv::Point2f;
@@ -19,7 +19,8 @@ nh_private_("~"),
 display_name_("projection_window"),
 debug_(false),
 window_is_open_(false),
-corner_file_path_("/tmp/tetris_corners.txt")
+corner_file_path_("/tmp/tetris_corners.txt"),
+tfListener(tfBuffer)
 {
   nh_private_.param<int>("/projector_width", img_size_.width, 1920);
   nh_private_.param<int>("/projector_height", img_size_.height, 1080);
@@ -43,6 +44,8 @@ corner_file_path_("/tmp/tetris_corners.txt")
 
 void ImageScreen::laser_cb(const sensor_msgs::LaserScanConstPtr &msg)
 {
+    return;
+
     if (metric_corners_.size() != 4)
     {
         ROS_WARN("Metric corners: %zu", metric_corners_.size());
@@ -56,7 +59,6 @@ void ImageScreen::laser_cb(const sensor_msgs::LaserScanConstPtr &msg)
     vector<Point2f> srcPoints;
 
     for (size_t i=0; i<cloud.points.size(); i+= 10)
-//        for (const auto& p: cloud.points)
     {
         const auto& p = cloud.points[i];
         srcPoints.push_back(Point2f(p.x, p.y));
@@ -84,7 +86,7 @@ void ImageScreen::laser_cb(const sensor_msgs::LaserScanConstPtr &msg)
 }
 
 
-void ImageScreen::point_cb_(const geometry_msgs::PointStampedConstPtr &pt) {
+void ImageScreen::point_cb_(const geometry_msgs::PointStampedConstPtr &pt_s) {
 
     if (metric_corners_.size() != 4)
     {
@@ -95,42 +97,50 @@ void ImageScreen::point_cb_(const geometry_msgs::PointStampedConstPtr &pt) {
     cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
     img.setTo(cv::Scalar(255,0,0));
 
-//    for (cv::Point2f p: c)
-//    {
-//        vector<Point2f> dstPoints, srcPoints;
-//
-//        srcPoints.push_back(cv::Point2f(p.x, p.y));
-//        cv::perspectiveTransform(srcPoints, dstPoints, warpMatrix);
-//        Point2f d  = dstPoints[0];
-//        ROS_INFO("Transformed to %f %f", d.x, d.y);
-//    }
+    geometry_msgs::PointStamped p2;
 
-    {
-        vector<cv::Point2f> pts;
+    std::string new_frame = "laser";
 
-        float l = 0.5;
+    ROS_INFO("Transforming from %s to %s", pt_s->header.frame_id.c_str(), new_frame.c_str());
 
-        pts.push_back(Point2f(pt->x, pt->y));
-        pts.push_back(Point2f(pt->x+l, pt->y));
-        pts.push_back(Point2f(pt->x+l, pt->y+l));
-        pts.push_back(Point2f(pt->x, pt->y+l));
-
-        vector<Point2f> dstPoints;
-        cv::perspectiveTransform(pts, dstPoints, metric2Pixels);
-
-        for (int i=0; i<4; ++i)
-        {
-            const auto& p1 = dstPoints[i];
-            const auto& p2 = dstPoints[(i+1)%4];
-
-            cv::line(img, cv::Point(p1.x, p1.y), cv::Point(p2.x, p2.y), cv::Scalar(255, 255, 0), 30);
-        }
-
+    try {
+        tfBuffer.transform(*pt_s, p2, new_frame);
+        ROS_INFO("In laser Frame: %f %f", p2.point.x, p2.point.y);
     }
+    catch (tf2::TransformException &ex)
+        {
+            ROS_WARN("Failure %s\n", ex.what()); //Print exception which was caught
+            return;
+     }
+
+    geometry_msgs::Point pt = p2.point;
+
+//    {
+//        vector<cv::Point2f> pts;
+//
+//        float l = 0.5;
+//
+//        pts.push_back(Point2f(pt.x, pt.y));
+//        pts.push_back(Point2f(pt.x+l, pt.y));
+//        pts.push_back(Point2f(pt.x+l, pt.y+l));
+//        pts.push_back(Point2f(pt.x, pt.y+l));
+//
+//        vector<Point2f> dstPoints;
+//        cv::perspectiveTransform(pts, dstPoints, metric2Pixels);
+//
+//        for (int i=0; i<4; ++i)
+//        {
+//            const auto& p1 = dstPoints[i];
+//            const auto& p2 = dstPoints[(i+1)%4];
+//
+//            cv::line(img, cv::Point(p1.x, p1.y), cv::Point(p2.x, p2.y), cv::Scalar(255, 255, 0), 30);
+//        }
+//
+//    }
 
 
     vector<Point2f> dstPoints, srcPoints;
-    srcPoints.push_back(Point2f(pt->x, pt->y));
+    srcPoints.push_back(Point2f(pt.x, pt.y));
     cv::perspectiveTransform(srcPoints, dstPoints, metric2Pixels);
 
     Point2f d  = dstPoints[0];
@@ -138,11 +148,8 @@ void ImageScreen::point_cb_(const geometry_msgs::PointStampedConstPtr &pt) {
     ROS_INFO("Transformed to %f %f", d.x, d.y);
 
     cv::circle(img, cv::Point(d.x, d.y), 20, cv::Scalar(0, 255, 0), -1);
-    cv::imshow(display_name_, img);
-    cv::waitKey(1);
 
-
-//    ROS_INFO("PT: %.f %.1f", pt->x, pt->y);
+    show_image(img);
 }
 
 

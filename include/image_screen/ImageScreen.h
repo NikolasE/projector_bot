@@ -6,6 +6,11 @@
 #include <std_msgs/Bool.h>
 #include <std_msgs/Empty.h>
 #include <mutex>
+#include <geometry_msgs/Point.h>
+
+#include <sensor_msgs/LaserScan.h>
+#include <laser_geometry/laser_geometry.h>
+
 
 class ImageScreen
 {
@@ -16,8 +21,7 @@ public:
   void set_black();
   void show_image(const cv::Mat& img);
   void close_image_window();
-  
-  
+
   ros::Time last_image_callback_;
   ros::Subscriber img_sub_;
 
@@ -25,10 +29,24 @@ public:
   void corner_trigger();
 
   void write_corners_();
-    void read_corners_();
-    std::string corner_file_path_;
+  void read_corners_();
+  std::string corner_file_path_;
 
-    cv::Mat warpMatrix;
+    laser_geometry::LaserProjection projector_;
+
+
+    std::vector<cv::Point2f> metric_corners_;
+
+  cv::Mat metric2Pixels;
+
+  cv::Mat warpMatrix;
+
+  ros::Subscriber sub_laser_;
+  void laser_cb(const sensor_msgs::LaserScanConstPtr& msg);
+
+
+  void point_cb_(const geometry_msgs::PointStampedConstPtr& pt);
+  ros::Subscriber sub_pt;
 
 // private:
   ros::NodeHandle nh_private_;

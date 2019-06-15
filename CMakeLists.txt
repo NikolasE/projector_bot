@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   eigen_conversions
   image_transport
+        laser_geometry
   pcl_ros
   roscpp
   tf2_ros
@@ -42,10 +43,10 @@ install(TARGETS
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-install(PROGRAMS
-  src/projector/nodes/game.py
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-)
+#install(PROGRAMS
+#  src/projector/nodes/game.py
+#  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+#)
 
 
 

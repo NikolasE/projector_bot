@@ -8,6 +8,12 @@
 #include <iostream>
 #include <fstream>
 
+
+
+
+using std::vector;
+using cv::Point2f;
+
 ImageScreen::ImageScreen():
 nh_private_("~"),
 display_name_("projection_window"),
@@ -16,14 +22,12 @@ window_is_open_(false),
 corner_file_path_("/tmp/tetris_corners.txt")
 {
   nh_private_.param<int>("/projector_width", img_size_.width, 1920);
-  nh_private_.param<int>("/projector_height", img_size_.height, 1200);
+  nh_private_.param<int>("/projector_height", img_size_.height, 1080);
   nh_private_.param<bool>("/debug", debug_, false);
   if (debug_)
   {
     ROS_INFO("Running in debug mode");
   }
-
-  // read_corners_();
 
   ROS_INFO("Expecting projector size of  %i %i", img_size_.width, img_size_.height);
   
@@ -31,17 +35,126 @@ corner_file_path_("/tmp/tetris_corners.txt")
   black_img_.setTo(0);
   
   reconnect();
-  
+
   open_image_window();
   cv::imshow(display_name_, black_img_);
   cv::waitKey(1);
 }
 
+void ImageScreen::laser_cb(const sensor_msgs::LaserScanConstPtr &msg)
+{
+    if (metric_corners_.size() != 4)
+    {
+        ROS_WARN("Metric corners: %zu", metric_corners_.size());
+        return;
+    }
+
+    sensor_msgs::PointCloud cloud;
+    projector_.projectLaser(*msg, cloud);
+
+
+    vector<Point2f> srcPoints;
+
+    for (size_t i=0; i<cloud.points.size(); i+= 10)
+//        for (const auto& p: cloud.points)
+    {
+        const auto& p = cloud.points[i];
+        srcPoints.push_back(Point2f(p.x, p.y));
+    }
+
+    vector<Point2f> dstPoints;
+    cv::perspectiveTransform(srcPoints, dstPoints, metric2Pixels);
+
+    cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
+    img.setTo(cv::Scalar(255,0,0));
+
+    for (const auto& px: dstPoints)
+    {
+        const cv::Point q(px.x, px.y);
+        if (q.x < 0 || q.y < 0 || q.x >= img_size_.width || q.y >=img_size_.height) {
+            continue;
+        }
+
+        cv::circle(img, q, 20, cv::Scalar(0, 0, 255), -1);
+
+    }
+
+    cv::imshow(display_name_, img);
+    cv::waitKey(1);
+}
+
+
+void ImageScreen::point_cb_(const geometry_msgs::PointStampedConstPtr &pt) {
+
+    if (metric_corners_.size() != 4)
+    {
+        ROS_WARN("Metric corners: %zu", metric_corners_.size());
+        return;
+    }
+
+    cv::Mat img = cv::Mat(img_size_.height, img_size_.width, CV_8UC3);
+    img.setTo(cv::Scalar(255,0,0));
+
+//    for (cv::Point2f p: c)
+//    {
+//        vector<Point2f> dstPoints, srcPoints;
+//
+//        srcPoints.push_back(cv::Point2f(p.x, p.y));
+//        cv::perspectiveTransform(srcPoints, dstPoints, warpMatrix);
+//        Point2f d  = dstPoints[0];
+//        ROS_INFO("Transformed to %f %f", d.x, d.y);
+//    }
+
+    {
+        vector<cv::Point2f> pts;
+
+        float l = 0.5;
+
+        pts.push_back(Point2f(pt->x, pt->y));
+        pts.push_back(Point2f(pt->x+l, pt->y));
+        pts.push_back(Point2f(pt->x+l, pt->y+l));
+        pts.push_back(Point2f(pt->x, pt->y+l));
+
+        vector<Point2f> dstPoints;
+        cv::perspectiveTransform(pts, dstPoints, metric2Pixels);
+
+        for (int i=0; i<4; ++i)
+        {
+            const auto& p1 = dstPoints[i];
+            const auto& p2 = dstPoints[(i+1)%4];
+
+            cv::line(img, cv::Point(p1.x, p1.y), cv::Point(p2.x, p2.y), cv::Scalar(255, 255, 0), 30);
+        }
+
+    }
+
+
+    vector<Point2f> dstPoints, srcPoints;
+    srcPoints.push_back(Point2f(pt->x, pt->y));
+    cv::perspectiveTransform(srcPoints, dstPoints, metric2Pixels);
+
+    Point2f d  = dstPoints[0];
+
+    ROS_INFO("Transformed to %f %f", d.x, d.y);
+
+    cv::circle(img, cv::Point(d.x, d.y), 20, cv::Scalar(0, 255, 0), -1);
+    cv::imshow(display_name_, img);
+    cv::waitKey(1);
+
+
+//    ROS_INFO("PT: %.f %.1f", pt->x, pt->y);
+}
+
 
 void ImageScreen::reconnect()
 {
+
+    read_corners_();
+
   last_image_callback_ = ros::Time::now();
-//  img_sub_ = nh_private_.subscribe("/game_window", 1, &ImageScreen::img_cb_, this);
+
+  sub_pt = nh_private_.subscribe("/pt", 1, &ImageScreen::point_cb_, this);
+  sub_laser_ = nh_private_.subscribe("/scan", 1, &ImageScreen::laser_cb, this);
 
   img_sub_ = nh_private_.subscribe("/usb_cam/image_raw", 1, &ImageScreen::img_cb_, this);
 
@@ -49,86 +162,49 @@ void ImageScreen::reconnect()
   toggle_sub_ = nh_private_.subscribe("black", 1, &ImageScreen::black_cb_, this);
 }
 
-void ImageScreen::black_cb_(const std_msgs::EmptyConstPtr& msg)
-{
-  ROS_INFO("Going dark");
-  set_black();
-}
-
-void ImageScreen::toggle_cb_(const std_msgs::BoolConstPtr& msg)
-{
-  if (msg->data)
-  {
-    open_image_window();
-  }else
-  {
-    close_image_window();
-  }
-}
 
 
-
-void mouseCB(int event, int x, int y, int flags, void* userdata)
-{
-//ROS_INFO("%i %i", x, y);
-  ImageScreen* is = (ImageScreen*) userdata;
-
-  if  ( event == cv::EVENT_LBUTTONUP )
-  {
-    if (is->corners.size() < 4)
+void ImageScreen::read_corners_() {
     {
-      is->corners.push_back(cv::Point2f(x, y));
-    } else {
-      // update closest point
-      float min_dist = 1e6;
-      int best_ndx = -1;
-
-      for (int i=0; i<is->corners.size(); ++i)
-      {
-        const cv::Point2f& p = is->corners[i];
-        float d = abs(p.x-x)+abs(p.y-y);
-        if (d < min_dist || best_ndx < 0)
-        {
-          best_ndx = i;
-          min_dist = d;
+        std::ifstream infile(corner_file_path_);
+        corners.clear();
+        float a, b;
+        while (infile >> a >> b) {
+            corners.push_back(cv::Point2f(a, b));
         }
-      }
-
-      is->corners[best_ndx] = cv::Point2f(x, y);
+        corner_trigger();
     }
-    is->corner_trigger();
-  }
-}
 
+    {
+        std::string filename = "/tmp/points.txt";
+        std::ifstream infile(filename);
+        float a, b;
 
-void ImageScreen::write_corners_()
-{
-  if (corners.size() != 4)
-  {
-    ROS_INFO("Not writing current corners (size is %zu)", corners.size());
-    return;
-  }
+        metric_corners_.clear();
 
-  std::ofstream myfile;
-  myfile.open (corner_file_path_);
-  for (int i=0; i<corners.size(); ++i)
-  {
-    myfile << corners[i].x << "  " << corners[i].y << std::endl;
-  }
+        while (infile >> a >> b) {
+            ROS_INFO("%f %f", a, b);
+            metric_corners_.push_back(cv::Point2f(a, b));
+        }
 
-  myfile.close();
-}
+        if (metric_corners_.size() != 4)
+        {
+            ROS_FATAL("metric size from file: %zu", metric_corners_.size());
+            return;
+        }
 
-void ImageScreen::read_corners_()
-{
-  std::ifstream infile(corner_file_path_);
-  corners.clear();
-  float a, b;
-  while (infile >> a >> b)
-  {
-    corners.push_back(cv::Point2f(a, b));
-  }
-  corner_trigger();
+        int w = img_size_.width;
+        int h = img_size_.height;
+        std::vector<cv::Point2f> pixels;
+        pixels.push_back(cv::Point2f(0,0));
+        pixels.push_back(cv::Point2f(w,0));
+        pixels.push_back(cv::Point2f(w,h));
+        pixels.push_back(cv::Point2f(0,h));
+
+        ROS_INFO("Created metric2pixels");
+
+        metric2Pixels = cv::getPerspectiveTransform(metric_corners_, pixels);
+    }
 }
 
 void ImageScreen::corner_trigger()
@@ -171,8 +247,10 @@ void ImageScreen::corner_trigger()
     cv::line(img, corners[i], corners[(i+1)%corners.size()], cv::Scalar(0, 255, 0));
   }
 
-  cv::imshow(display_name_, img);
-  cv::waitKey(1);
+  show_image(img);
+
+//  cv::imshow(display_name_, img);
+//  cv::waitKey(1);
 }
 
 
@@ -185,11 +263,11 @@ void ImageScreen::open_image_window()
   ROS_INFO("Opening window");
   cv::namedWindow(display_name_, CV_WINDOW_NORMAL); // CV_WINDOW_AUTOSIZE);
 
-  cv::setMouseCallback(display_name_, mouseCB, this);
+//  cv::setMouseCallback(display_name_, mouseCB, this);
 
-  if (!debug_)
+//  if (!debug_)
   {
-    // cv::moveWindow(display_name_, 1920*1.5, 100);
+    cv::moveWindow(display_name_, 0,0); // 1920*1.5, 100);
     cv::setWindowProperty(display_name_, CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
   }
   cv::waitKey(10);
@@ -267,8 +345,6 @@ void ImageScreen::img_cb_(const sensor_msgs::ImageConstPtr& msg)
 }
 
 
-
-
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "image_screen");
@@ -289,4 +365,76 @@ int main(int argc, char** argv)
   
   ros::spin();
   return EXIT_SUCCESS;
+}
+
+
+
+void ImageScreen::black_cb_(const std_msgs::EmptyConstPtr& msg)
+{
+    ROS_INFO("Going dark");
+    set_black();
+}
+
+void ImageScreen::toggle_cb_(const std_msgs::BoolConstPtr& msg)
+{
+    if (msg->data)
+    {
+        open_image_window();
+    }else
+    {
+        close_image_window();
+    }
+}
+
+
+
+
+void ImageScreen::write_corners_()
+{
+    if (corners.size() != 4)
+    {
+        ROS_INFO("Not writing current corners (size is %zu)", corners.size());
+        return;
+    }
+
+    std::ofstream myfile;
+    myfile.open (corner_file_path_);
+    for (int i=0; i<corners.size(); ++i)
+    {
+        myfile << corners[i].x << "  " << corners[i].y << std::endl;
+    }
+
+    myfile.close();
+}
+
+void mouseCB(int event, int x, int y, int flags, void* userdata)
+{
+//ROS_INFO("%i %i", x, y);
+//  ImageScreen* is = (ImageScreen*) userdata;
+//
+//  if  ( event == cv::EVENT_LBUTTONUP )
+//  {
+//    if (is->corners.size() < 4)
+//    {
+//      is->corners.push_back(cv::Point2f(x, y));
+//    } else {
+//      // update closest point
+//      float min_dist = 1e6;
+//      int best_ndx = -1;
+//
+//      for (int i=0; i<is->corners.size(); ++i)
+//      {
+//        const cv::Point2f& p = is->corners[i];
+//        float d = abs(p.x-x)+abs(p.y-y);
+//        if (d < min_dist || best_ndx < 0)
+//        {
+//          best_ndx = i;
+//          min_dist = d;
+//        }
+//      }
+//
+//      is->corners[best_ndx] = cv::Point2f(x, y);
+//    }
+//    is->corner_trigger();
+//  }
 }

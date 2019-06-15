@@ -6,7 +6,7 @@
   <node pkg="tf" type="static_transform_publisher" name="las_broadcaster" args="0 0 0 0 0 0 laser laser_mount_link 100"/>
 
   <!-- laser -->
-  <node pkg="sick_tim" type="sick_tim310" name="laser"/>
+  <include file="$(find sick_tim)/launch/sick_tim571_2050101.launch" />
 
   <!-- odometry -->
   <node pkg="laser_scan_matcher" type="laser_scan_matcher_node" name="laser_scan_matcher_node" output="screen">
